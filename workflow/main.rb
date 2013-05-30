@@ -4,40 +4,45 @@
 require 'rubygems' unless defined? Gem # rubygems is only needed in 1.8
 require "bundle/bundler/setup"
 require "alfred"
+require 'fog'
 
-
-
+AWS_ACCESS_KEY = "AKIAIPLUUKDZOY4PCEFQ"
+AWS_SECRET_KEY = "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"
 
 Alfred.with_friendly_error do |alfred|
-  fb = alfred.feedback
+  fb         = alfred.feedback
+  connection = Fog::Compute.new({
+                                    :provider              => 'AWS',
+                                    :aws_access_key_id     => AWS_ACCESS_KEY,
+                                    :aws_secret_access_key => AWS_SECRET_KEY
+                                })
 
-  # add a file feedback
-  fb.add_file_item(File.expand_path "~/Applications/")
+  cloudwatch = Fog::AWS::CloudWatch.new(:aws_access_key_id => AWS_ACCESS_KEY, :aws_secret_access_key => AWS_SECRET_KEY)
 
-  # add an arbitrary feedback
-  fb.add_item({
-    :uid      => ""                     ,
-    :title    => "Just a Test"          ,
-    :subtitle => "feedback item"        ,
-    :arg      => "A test feedback Item" ,
-    :valid    => "yes"                  ,
-  })
-  
-  # add an feedback to test rescue feedback
-  fb.add_item({
-    :uid          => ""                     ,
-    :title        => "Rescue Feedback Test" ,
-    :subtitle     => "rescue feedback item" ,
-    :arg          => ""                     ,
-    :autocomplete => "failed"               ,
-    :valid        => "no"                   ,
-  })
+  servers = connection.servers.sort_by { |server| server.id }
 
-  if ARGV[0].eql? "failed"
-    alfred.with_rescue_feedback = true
-    raise Alfred::NoBundleIDError, "Wrong Bundle ID Test!"
+  #puts servers.inspect
+
+  servers.each do |server|
+    output = case server.state
+               when 'running'
+                 result   = cloudwatch.get_metric_statistics({ 'MetricName' => "CPUUtilization",
+                                                               "Statistics" => ["Average"],
+                                                               'StartTime'  => (Time.now.utc-(10*60)).iso8601,
+                                                               'EndTime'    => Time.now.utc.iso8601,
+                                                               'Period'     => 300,
+                                                               'Namespace'  => 'AWS/EC2',
+                                                               'Dimensions' => [{ "Name" => "InstanceId", "Value" => server.id }] })
+                 #puts result.inspect
+                 cpu_data = result.body["GetMetricStatisticsResult"]["Datapoints"]
+                 cpu      = cpu_data ? "#{cpu_data.first["Average"]}%" : "Unknown"
+
+                 "#{server.id} (#{server.state} cpu: #{cpu})"
+               else
+                 "#{server.id} (#{[server.state].join(' ')})"
+             end
+    fb.add_item(:title => server.tags['Name'], :subtitle => output)
   end
-
   puts fb.to_xml(ARGV)
 end
 

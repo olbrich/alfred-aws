@@ -2,3 +2,6 @@ source "https://rubygems.org"
 
 gem "plist"
 gem "alfred-workflow"
+gem 'fog'
+gem 'multi_json'
+gem 'awesome_print'
