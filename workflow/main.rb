@@ -6,8 +6,8 @@ require "bundle/bundler/setup"
 require "alfred"
 require 'fog'
 
-AWS_ACCESS_KEY = "AKIAIPLUUKDZOY4PCEFQ"
-AWS_SECRET_KEY = "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"
+AWS_ACCESS_KEY = ""
+AWS_SECRET_KEY = ""
 
 Alfred.with_friendly_error do |alfred|
   fb         = alfred.feedback
